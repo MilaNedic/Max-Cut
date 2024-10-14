@@ -17,11 +17,11 @@ function [cpu_time, gpu_time] = eig_time_comparison(n, m)
         D = gpuDevice;
         % Measure GPU time
         B = gpuArray(A); % B is a random matrix of size n x n on the GPU
-        wait(D)
+        wait(D); % Ensure all previous GPU operations are done before starting timer
         tic;
-        eig(B); % compute eigenvalues on the GPU
-        gpu_times(i) = toc;
-        wait(D)
+        eig(B); % Compute eigenvalues on GPU
+        wait(D); % Wait for GPU to complete the eigenvalue computation
+        gpu_times(i) = toc; %gputimeit(@() eig(B));
 
     end
        
