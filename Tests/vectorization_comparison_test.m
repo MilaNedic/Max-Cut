@@ -1,5 +1,5 @@
-% Test script for test the difference in execution time of non-vectorized
-% and vectorized operation on the CPU and the GPU
+% Test script for testing the difference in execution time of non-vectorized
+% and vectorized operation on CPU and GPU
 f = @(x) sin(x);
 
 [cpu_time, cpu_time_vec, gpu_time, gpu_time_vec] = vectorization_comparison(f);
