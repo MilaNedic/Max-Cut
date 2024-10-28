@@ -1,42 +1,63 @@
-% Test script for fast convolution using tic and toc
+%% Test script for fast convolution using tic and toc
 
 % Initialize random, complex input data and a random filter vector
 data = complex(randn(4096,100), randn(4096,100));
 filter = randn(16,1);
 
-% Measure CPU time (non-vectorized) using tic/toc
-tic;
-fastConvolution(data, filter);
-CPUtime = toc;
-fprintf('CPU time: %f seconds\n', CPUtime);
+% Number of iterations for averaging
+iterations = 100;
+
+% Initialize accumulators for CPU and GPU times
+CPUtime_sum = 0;
+GPUtime_sum = 0;
+CPUtimeVectorized_sum = 0;
+GPUtimeVectorized_sum = 0;
+
+% Measure and average CPU time (non-vectorized)
+for i = 1:iterations
+    tic;
+    fastConvolution(data, filter);
+    CPUtime_sum = CPUtime_sum + toc;
+end
+CPUtime = CPUtime_sum / iterations;
+fprintf('Average CPU time: %f seconds\n', CPUtime);
 
 % Select a GPU device
 gpu = gpuDevice;
-disp(gpu.Name + " GPU selected.")
+disp(gpu.Name + " GPU selected.");
 
 % Transfer the data to the GPU
 gData = gpuArray(data);
 gFilter = gpuArray(filter);
 
-% Measure GPU time (non-vectorized) using tic/toc
-tic;
-fastConvolution(gData, gFilter);
-wait(gpu);  % Ensure that the GPU finishes the task before measuring time
-GPUtime = toc;
-fprintf('GPU time: %f seconds\n', GPUtime);
+% Measure and average GPU time (non-vectorized)
+for i = 1:iterations
+    tic;
+    fastConvolution(gData, gFilter);
+    wait(gpu);  % Ensure that the GPU finishes the task before measuring time
+    GPUtime_sum = GPUtime_sum + toc;
+end
+GPUtime = GPUtime_sum / iterations;
+fprintf('Average GPU time: %f seconds\n', GPUtime);
 
-% Measure CPU time (vectorized) using tic/toc
-tic;
-fastConvolutionVectorized(data, filter);
-CPUtimeVectorized = toc;
-fprintf('CPU time (vectorized): %f seconds\n', CPUtimeVectorized);
+% Measure and average CPU time (vectorized)
+for i = 1:iterations
+    tic;
+    fastConvolutionVectorized(data, filter);
+    CPUtimeVectorized_sum = CPUtimeVectorized_sum + toc;
+end
+CPUtimeVectorized = CPUtimeVectorized_sum / iterations;
+fprintf('Average CPU time (vectorized): %f seconds\n', CPUtimeVectorized);
 
-% Measure GPU time (vectorized) using tic/toc
-tic;
-fastConvolutionVectorized(gData, gFilter);
-wait(gpu);  % Ensure that the GPU finishes the task before measuring time
-GPUtimeVectorized = toc;
-fprintf('GPU time (vectorized): %f seconds\n', GPUtimeVectorized);
+% Measure and average GPU time (vectorized)
+for i = 1:iterations
+    tic;
+    fastConvolutionVectorized(gData, gFilter);
+    wait(gpu);  % Ensure that the GPU finishes the task before measuring time
+    GPUtimeVectorized_sum = GPUtimeVectorized_sum + toc;
+end
+GPUtimeVectorized = GPUtimeVectorized_sum / iterations;
+fprintf('Average GPU time (vectorized): %f seconds\n', GPUtimeVectorized);
 
 % Compute speedups
 CPUspeedup = CPUtime / CPUtimeVectorized;

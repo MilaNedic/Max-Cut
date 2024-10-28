@@ -1,33 +1,57 @@
 % Test script for fast convolution
 
-% Initialize a random,c omplex input data and a random filter vector
-data = complex(randn(4096,100),randn(4096,100));
+% Initialize a random, complex input data and a random filter vector
+data = complex(randn(4096,100), randn(4096,100));
 filter = randn(16,1);
 
-% Display CPU time
-CPUtime = timeit(@()fastConvolution(data,filter));
-fprintf('CPU time: %f\n', CPUtime);
+% Number of iterations for averaging
+iterations = 100;
+
+% Initialize accumulators for CPU and GPU times
+CPUtime_sum = 0;
+GPUtime_sum = 0;
+CPUtimeVectorized_sum = 0;
+GPUtimeVectorized_sum = 0;
+
+% Measure and average CPU time
+for i = 1:iterations
+    CPUtime_sum = CPUtime_sum + timeit(@() fastConvolution(data, filter));
+end
+CPUtime = CPUtime_sum / iterations;
+fprintf('Average CPU time: %f\n', CPUtime);
 
 % Select a GPU device
 gpu = gpuDevice;
-disp(gpu.Name + " GPU selected.")
+disp(gpu.Name + " GPU selected.");
 
 % Transfer the data to the GPU
 gData = gpuArray(data);
 gFilter = gpuArray(filter);
 
-% Display GPU time
-GPUtime = gputimeit(@()fastConvolution(gData,gFilter));
-fprintf('GPU time: %f\n', GPUtime)
+% Measure and average GPU time
+for i = 1:iterations
+    GPUtime_sum = GPUtime_sum + gputimeit(@() fastConvolution(gData, gFilter));
+end
+GPUtime = GPUtime_sum / iterations;
+fprintf('Average GPU time: %f\n', GPUtime);
 
-CPUtimeVectorized = timeit(@()fastConvolutionVectorized(data,filter));
-fprintf('CPU time vectorized: %f\n', CPUtimeVectorized);
+% Measure and average CPU time for vectorized version
+for i = 1:iterations
+    CPUtimeVectorized_sum = CPUtimeVectorized_sum + timeit(@() fastConvolutionVectorized(data, filter));
+end
+CPUtimeVectorized = CPUtimeVectorized_sum / iterations;
+fprintf('Average CPU time vectorized: %f\n', CPUtimeVectorized);
 
-GPUtimeVectorized = gputimeit(@()fastConvolutionVectorized(gData,gFilter));
-fprintf('GPU time vectorized: %f\n', GPUtimeVectorized);
+% Measure and average GPU time for vectorized version
+for i = 1:iterations
+    GPUtimeVectorized_sum = GPUtimeVectorized_sum + gputimeit(@() fastConvolutionVectorized(gData, gFilter));
+end
+GPUtimeVectorized = GPUtimeVectorized_sum / iterations;
+fprintf('Average GPU time vectorized: %f\n', GPUtimeVectorized);
 
-CPUspeedup = CPUtime/CPUtimeVectorized;
-GPUspeedup = GPUtime/GPUtimeVectorized;
+% Compute speedups
+CPUspeedup = CPUtime / CPUtimeVectorized;
+GPUspeedup = GPUtime / GPUtimeVectorized;
 
 fprintf('CPU speedup: %f\n', CPUspeedup);
 fprintf('GPU speedup: %f\n', GPUspeedup);
@@ -37,36 +61,36 @@ bar(categorical(["CPU" "GPU"]), ...
     [CPUtime CPUtimeVectorized; GPUtime GPUtimeVectorized], ...
     "grouped")
 ylabel("Execution Time (s)")
-legend("Unvectorized","Vectorized")
+legend("Unvectorized", "Vectorized")
 
 % ------------------------ AUX FUNCTIONS -------------------------------
-function y = fastConvolution(data,filter)
-% Zero-pad filter to the column length of data, and transform
-[rows,cols] = size(data);
-filter_f = fft(filter,rows);
+function y = fastConvolution(data, filter)
+    % Zero-pad filter to the column length of data, and transform
+    [rows, cols] = size(data);
+    filter_f = fft(filter, rows);
 
-% Create an array of zeros of the same size and class as data
-y = zeros(rows,cols,'like',data);
+    % Create an array of zeros of the same size and class as data
+    y = zeros(rows, cols, 'like', data);
 
-for idx = 1:cols
-    % Transform each column of data
-    data_f = fft(data(:,idx));
-    % Multiply each column by filter and compute inverse transform
-    y(:,idx) = ifft(filter_f.*data_f);
-end
-
+    for idx = 1:cols
+        % Transform each column of data
+        data_f = fft(data(:, idx));
+        % Multiply each column by filter and compute inverse transform
+        y(:, idx) = ifft(filter_f .* data_f);
+    end
 end
 
 % ----------------------------------------------------------------------
 
-function y = fastConvolutionVectorized(data,filter)
-% Zero-pad filter to the length of data, and transform
-[rows,~] = size(data);
-filter_f = fft(filter,rows);
+function y = fastConvolutionVectorized(data, filter)
+    % Zero-pad filter to the length of data, and transform
+    [rows, ~] = size(data);
+    filter_f = fft(filter, rows);
 
-% Transform each column of the input
-data_f = fft(data);
+    % Transform each column of the input
+    data_f = fft(data);
 
-% Multiply each column by filter and compute inverse transform
-y = ifft(filter_f.*data_f);
+    % Multiply each column by filter and compute inverse transform
+    y = ifft(filter_f .* data_f);
 end
+
