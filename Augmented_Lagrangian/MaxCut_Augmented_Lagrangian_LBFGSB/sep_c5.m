@@ -5,7 +5,7 @@ function [I5, f] = sep_c5( X);
 e = ones(5,1);H1 = e*e';
 e(1) = -1; H2 = e*e';
 e(2) = -1; H3 = e*e';
-trials = 1000;%2*size(X,1);%100; % 1000 is good overall % for small graphs this number shouldd not be too big!!
+trials = 3000;%2*size(X,1);%100; % 1000 is good overall % for small graphs this number shouldd not be too big!!
 f = zeros( 3*trials, 1); 
 I5 = zeros(5, 3*trials); 
 for i=1:trials

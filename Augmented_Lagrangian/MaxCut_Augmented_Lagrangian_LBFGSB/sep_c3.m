@@ -4,7 +4,7 @@ function [I3, f] = sep_c3( X);
 
 e = ones(3,1);H1 = e*e';
 e(1) = -1; H2 = e*e';
-trials = 100;%2*size(X,1);%100; % 1000 is good overall % for small graphs this number shouldd not be too big!!
+trials = 1000;%2*size(X,1);%100; % 1000 is good overall % for small graphs this number shouldd not be too big!!
 f = zeros( 2*trials, 1); 
 I3 = zeros(5, 2*trials); 
 for i=1:trials

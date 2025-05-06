@@ -6,7 +6,7 @@ e = ones(7,1);H1 = e*e';
 e(1) = -1; H2 = e*e';
 e(2) = -1; H3 = e*e';
 e(3) = -1; H4 = e*e';
-trials = 1000;%2*size(X,1);%100; % 1000 is good overall % for small graphs this number shouldd not be too big!!
+trials = 3000;%2*size(X,1);%100; % 1000 is good overall % for small graphs this number shouldd not be too big!!
 f = zeros( 4*trials, 1); 
 I7 = zeros(7, 4*trials); 
 for i=1:trials

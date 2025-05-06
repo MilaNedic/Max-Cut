@@ -1,34 +1,17 @@
-function [X, A, b, t, fopt, secs] = main(L,method)
+function [X, A,b, fopt,final_output] = max_cut_hyper_metric_lbfgsb(L,method,k,N)
 % TODO: MAIN routine for computing SDP relaxation of MAX-CUT strengthen by
 % triangle and pentagonal inequalities using Augmented Lagrangian method
 % applied to dual SDP
 %
 % input:    L   ... Laplacian matrix of the graph ( L = diag(Ae)-A )
-%           var ... empty (or 3) or 5, determines if triangle or triangle +
-%                   pentagonal inequalities are used
-%
+%           method ... Augm Lang or Augm lagra with penalty term
+%           k      ... level of hypermetric inequalties
+%           N      ... total number of hypermetric inequalities to be used
 % output:   X       ... optimal solution of the primal SDP
-%           fopt    ... best upper bound
-%           secs    ... running time
+%           A,b     ... final hypermetric ineq.
+%           fopt    ... best upper bound<
 %
-% call: 
-%
-% for triangles:
-%       [X, fopt, secs] = main(L);
-% or 
-%       [X, fopt, secs] = main(L,3);
-%
-% for triangles + pentagonal inequalities:
-%       [X, fopt, secs] = main(L,5);
-%
-% ALGORITHM:
-% a) compute basic SDP relaxation (interior-point method)
-% b) add some number of violated constraints and solve the obtained SDP by
-%    ADMM method
-% c) purge inactive constraints and go to b)
-
-% TODO: use interior point method for initial relaxtion or use directly
-% lbfgs
+%% call: [X, A,b, fopt,final_output] = max_cut_hyper_metric_lbfgsb(L,method,k,N)
 
 rng(2020);
 
@@ -36,10 +19,11 @@ rng(2020);
 tstart = tic;
 n = size(L,1);
 
-hyp = 3; % Change this parameter to 5 for pentagonal inequalities etc.
+hyp =k;
 alpha = 10;  
 
-[b, A, X, y, alpha,fopt] = mcstart(L,alpha,method);
+[b, A, X, y,alpha,fopt] = mcstart(L,alpha,method);
+
 
 
 m = length(b);
@@ -59,8 +43,17 @@ maxv5 = 1;
 level3 = 0.001;  % violation level for C3 to stop early --> change this to 0.05
 level5 = 0.01;  %0.15;
 
-
-fprintf('        time       bnd         m      purged     maxv3     added3     maxv5     added5     maxv7    added7    maxv9    added9   maxv11   added11\n');
+fprintf('\n        time       bnd         m      purged');
+for i=3:2:k
+    if i < 10
+        fprintf('     max_v_%1d     added_%1d',i,i);
+    elseif i==11 
+        fprintf('     max_v_%2d    added_%2d',i,i);
+    else
+        fprintf('    max_v_%2d    added_%2d',i,i);
+    end
+end
+fprintf('\n')
 
 done = 0;
 
@@ -70,14 +63,17 @@ u  = inf(n + m,1);          % there is no upper bound
 
 % Request very high accuracy for this test:
 opts    = struct('m', 10, 'printEvery', 0);%,'factr', 1e4);
-opts.maxIts = 1000;
-%opts.factr=1e+4;
+opts.maxIts = 100; % 100 default
+opts.factr=0;
 %opts.pgtol = 0;
 
 opts.pgtol=8e-2;
-scale_tol = 0.9;
-min_tol = 1e-5;
+scale_tol = 0.95;
+min_tol = 1e-5; %5e-2 default
 
+num_i = ceil(2*N/(hyp-3));
+
+final_output=zeros(ceil((hyp-1)/2),3);
 
 % main loop
 for cnt = 1:maxit
@@ -136,52 +132,6 @@ for cnt = 1:maxit
         end
     end
     
-   
-    
-
-
-    % use L-BFGS-B to minimize the dual function
-    %f = @(var) dual_function(L,var,X,A,b,alpha);
-    
-     
-%     opts.x0 = [y;z];
-%     m = length(b);
-%     l  = [-inf(n,1); zeros(m,1)];     
-%     u  = inf(n + m,1);          % there is no upper bound
-    
-%     [var,val,info] = lbfgsb(f,l,u,opts);
-%     
-%     y = var(1:n);
-%     z = var(n+1:end);
-%     
-%     
-%     Atz = reshape(A'*z,n,n);
-%     
-%      X = project_W(X + 1/alpha*(L - diag(y) - Atz));
-    
-%     % valid upper bound
-%     lambda = min(eig(Atz + diag(y) - L));
-%     
-%     % update y
-%     y0 = y + abs(lambda) * ones(n,1);
-%     
-%     fopt = sum(y0) + b'*z;
-%     
-%     fprintf('eig bound: %f\n',fopt);
-    
-%     Z_new = L-diag(y)-Atz;
-% [~, y_test, ~, phi] = ipm_mc_pk(Z_new);
-% fopt = sum(y) + b'*z + phi;
-    
-    %fprintf('sdp bound: %f\n',fopt);
-    %
-
-    
-    % get primal matrix from dual solution
-    
-
-
-    
     % purge inactive constraints
     old = length(b);
     [b, A, z] = inequality_purge(b, A, z);
@@ -213,86 +163,35 @@ for cnt = 1:maxit
     
     new_triag = length(b);
     fprintf('       %4d', new_triag - old); % added3
+    final_output(1,:)=[3 maxv (new_triag - old)];
     
     % add pentagonal inequalities if triangles can not reduce bound anymore
-    if maxv < 0.3 && (hyp >= 5)  
-        old_penta = length(b); % number of old
-        [C5,~] = sep_c5(X);
-        A5 = C5_to_a(n, C5');
-        maxv5 = max(1- A5*X(:));   % largest C5 violation
-        
-        fprintf('   %7.3f', maxv5);
-        
-        % new data
-        %A = [A; -A5];
-        %b = [b;-ones(size(A5,1),1)];
-        factor = 1/1;%sqrt(10);
-        A = [-factor*A5; A];
-        b = [-factor*ones(size(A5,1),1); b];
-        
-        new_penta = length(b);
-        fprintf('       %4d', new_penta - old_penta); % added5
-        
-    end
-    
-    if maxv < 0.3 && (hyp >= 7)
-        old_hepta = length(b);
-        C7 = sep_c7( X);
-        A7 = C7_to_a(n, C7');
-        maxv7 = max(1- A7*X(:));
-        fprintf('   %7.3f', maxv7);   
-        
-        A = [-A7; A];
-        b = [-ones(size(A7,1),1); b];
-        
-        new_hepta = length(b);
-        fprintf('     %4d', new_hepta - old_hepta); % added7
+    if maxv < 0.3 
+        for hyp_i=5:2:hyp
+            old_penta = length(b); % number of old
+            [C_n,~] = sep_c_n(X,hyp_i,num_i);
+            A_n = C_n_to_a(n, C_n');
+            maxv_hyp = max(1- A_n*X(:));   % largest C_n violation
+            if isempty(maxv_hyp)
+                maxv_hyp = 0;
+            end
 
-    end
-    
-    if  maxv < 0.3 && (hyp >= 9)
-        old_nona = length(b);
-        C9 = sep_c9( X);
-        A9 = C9_to_a(n, C9');
-        maxv9 = max(1- A9*X(:));
-        fprintf('   %7.3f', maxv9);   
-        
-        A = [-A9; A];
-        b = [-ones(size(A9,1),1); b];
-        
-        new_nona = length(b);
-        fprintf('     %4d', new_nona - old_nona); % added9
+            fprintf('      %7.3f', maxv_hyp);
 
-    end
-    
-    if (maxv<0.3) && (hyp >= 11)
-        old_11 = length(b);
-        C11 = sep_c11( X);
-        A11 = C11_to_a(n, C11');
-        maxv11 = max(1- A11*X(:));
-        fprintf('   %7.3f', maxv11);   
-        
-        A = [-A11; A];
-        b = [-ones(size(A11,1),1); b];
-        
-        new_11 = length(b);
-        fprintf('     %4d', new_11 - old_11); % added9
+            % new data
+            %A = [A; -A5];
+            %b = [b;-ones(size(A5,1),1)];
+            factor = 1/1;%sqrt(10);
+            A = [-factor*A_n; A];
+            b = [-factor*ones(size(A_n,1),1); b];
 
-    end
-    
-    if (maxv<0.3) && (hyp == 13)
-        old_13 = length(b);
-        C13 = sep_c13( X);
-        A13 = C13_to_a(n, C13');
-        maxv11 = max(1- A13*X(:));
-        fprintf('   %7.3f', maxv11);   
-        
-        A = [-A13; A];
-        b = [-ones(size(A13,1),1); b];
-        
-        new_13 = length(b);
-        fprintf('     %4d', new_13 - old_13); % added9
-
+            new_penta = length(b);
+            fprintf('       %4d', new_penta - old_penta); % added hyp. ineq.
+            if floor((hyp_i-1)/2)~=ceil((hyp_i-1)/2) || isempty(hyp_i) || isempty(maxv_hyp) || isempty(new_penta - old_penta)
+                keyboard;
+            end
+            final_output((hyp_i-1)/2,:)=[hyp_i maxv_hyp (new_penta - old_penta)];
+        end
     end
     
     fprintf('\n');
@@ -301,13 +200,12 @@ for cnt = 1:maxit
     
     %fprintf('new cuting planes: %d\n',new - old);
     
-    % add zero dual multiplier to t for new cuts
+    % add zero dual multiplier to z for new cuts
     z = [zeros(new-old,1);z]; 
     
-    %secs = toc(tstart);
     
     % reduce alpha
-    if new_triag - old < 50 %|| (abs(fold - fopt) < 1)
+    if new_triag - old < 50 || (abs(fold - fopt) < 1)
         alpha = alpha * 0.5; % todo: how to decrease?? 0.5 or 0.8
         fprintf('decrease alpha to value %f\n',alpha);
 %         hyp = 3; % the  first iter after alpha decreases remove pentagonal cuts
@@ -320,7 +218,8 @@ for cnt = 1:maxit
         end
     end 
     
-    if (alpha < 1e-6) % && (abs(fold - fopt) < 0.5) % and if bound not close to cut
+    if (alpha < 1e-5) && (abs(fold - fopt) < 0.5) % and if bound not close to 
+    % (alpha < 5e-3) && (abs(fold - fopt) < 0.5)
         break;
     end
     
